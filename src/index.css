@@ -1,0 +1,31 @@
+@import "tailwindcss";
+@plugin "daisyui";
+@import 'swiper/css';
+@import 'swiper/css/pagination';
+@import 'swiper/css/navigation';
+
+
+/* 1) Make sure the font file is placed at: public/CooperBlack-Std.otf */
+/* 2) Use the public URL path (no /public in the URL) */
+
+@font-face {
+  font-family: "CooperBlack";
+  src: url("/CooperBlack-Std.otf") format("opentype");
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap; /* better UX while font loads */
+}
+
+/* optional bolder weight if you have a separate file for bold:
+@font-face {
+  font-family: "CooperBlack";
+  src: url("/CooperBlack-Std-Bold.otf") format("opentype");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+*/
+
+.cooper {
+  font-family: "CooperBlack", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
