@@ -92,7 +92,6 @@ export default function Contact() {
       .sendForm(SERVICE_ID, TEMPLATE_ID, formRef.current, PUBLIC_KEY)
       .then(
         (result) => {
-          console.log("SUCCESS!", result.text);
           setSubmitStatus("success");
           setFormData({
             fullName: "",
@@ -104,7 +103,6 @@ export default function Contact() {
           setTimeout(() => setSubmitStatus(null), 5000);
         },
         (error) => {
-          console.log("FAILED...", error.text);
           setSubmitStatus("error");
           setTimeout(() => setSubmitStatus(null), 5000);
         }

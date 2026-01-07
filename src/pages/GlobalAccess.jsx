@@ -36,6 +36,7 @@ import AIChatWidget from "../Components/AIChatWidget";
 import { callGemini } from "../utils/geminiApi";
 import ScrollToTop from "../Components/ScrollToTop";
 import emailjs from "@emailjs/browser";
+import { uploadToCloudinary } from "../utils/cloudinaryUpload";
 
 /* --- Custom CSS for Advanced Animations --- */
 const customStyles = `
@@ -105,6 +106,9 @@ const GlobalAccess = () => {
   const [submitted, setSubmitted] = useState(false);
   const [submitStatus, setSubmitStatus] = useState(null);
   const [cvFile, setCvFile] = useState(null);
+  const [cvFileObj, setCvFileObj] = useState(null); // Store actual file object
+  const [cvUrl, setCvUrl] = useState(""); // Cloudinary URL
+  const [isUploadingCv, setIsUploadingCv] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   const [formData, setFormData] = useState({
@@ -185,53 +189,82 @@ const GlobalAccess = () => {
     }
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setIsSubmitting(true);
     setSubmitStatus(null);
 
-    // EmailJS credentials from environment variables
-    const SERVICE_ID = import.meta.env.VITE_SERVICE_ID;
-    const PUBLIC_KEY = import.meta.env.VITE_PUBLIC_KEY;
-
-    // Use JOB template for career applications only
-    const TEMPLATE_ID = import.meta.env.VITE_JOB_TEMPLATE_ID;
-
-    // Use sendForm like Contact page - reads directly from form inputs
-    emailjs
-      .sendForm(SERVICE_ID, TEMPLATE_ID, formRef.current, PUBLIC_KEY)
-      .then(
-        (result) => {
-          console.log("SUCCESS!", result.text);
-          setSubmitStatus("success");
-          setSubmitted(true);
-          // Reset form
-          setFormData({
-            fullName: "",
-            email: "",
-            phone: "",
-            country: "",
-            qualification: "",
-            languageProficiency: "",
-            occupation: "",
-            hasPassport: "",
-            travelDate: "",
-            department: "",
-            experience: "",
-          });
-          setCvFile(null);
-          setAiRoadmap("");
-          setCvAnalysis("");
-        },
-        (error) => {
-          console.error("FAILED...", error);
+    try {
+      // Upload CV to Cloudinary first (only for career applications with CV)
+      let uploadedCvUrl = cvUrl;
+      if (view === "career" && cvFileObj && !cvUrl) {
+        setIsUploadingCv(true);
+        try {
+          const uploadResult = await uploadToCloudinary(cvFileObj);
+          // Use downloadUrl for direct download in email
+          uploadedCvUrl = uploadResult.downloadUrl;
+          setCvUrl(uploadedCvUrl);
+        } catch (uploadError) {
+          console.error("CV Upload failed:", uploadError);
           setSubmitStatus("error");
-          setTimeout(() => setSubmitStatus(null), 5000);
+          setIsSubmitting(false);
+          setIsUploadingCv(false);
+          return;
         }
-      )
-      .finally(() => {
-        setIsSubmitting(false);
+        setIsUploadingCv(false);
+      }
+
+      // EmailJS credentials from environment variables
+      const SERVICE_ID = import.meta.env.VITE_SERVICE_ID;
+      const PUBLIC_KEY = import.meta.env.VITE_PUBLIC_KEY;
+      const TEMPLATE_ID = import.meta.env.VITE_JOB_TEMPLATE_ID;
+
+      // Send email with CV URL using emailjs.send() for custom params
+      const templateParams = {
+        fullName: formData.fullName,
+        email: formData.email,
+        phone: formData.phone,
+        department: formData.department,
+        experience: formData.experience,
+        cvFileName: cvFile || "No CV uploaded",
+        cvUrl: uploadedCvUrl || "No CV uploaded",
+      };
+
+      const result = await emailjs.send(
+        SERVICE_ID,
+        TEMPLATE_ID,
+        templateParams,
+        PUBLIC_KEY
+      );
+      setSubmitStatus("success");
+      setSubmitted(true);
+
+      // Reset form
+      setFormData({
+        fullName: "",
+        email: "",
+        phone: "",
+        country: "",
+        qualification: "",
+        languageProficiency: "",
+        occupation: "",
+        hasPassport: "",
+        travelDate: "",
+        department: "",
+        experience: "",
       });
+      setCvFile(null);
+      setCvFileObj(null);
+      setCvUrl("");
+      setAiRoadmap("");
+      setCvAnalysis("");
+    } catch (error) {
+      console.error("FAILED...", error);
+      setSubmitStatus("error");
+      setTimeout(() => setSubmitStatus(null), 5000);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   // --- Render Components ---
@@ -617,10 +650,12 @@ const GlobalAccess = () => {
                             <input
                               type="file"
                               className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20"
-                              accept=".pdf,.doc"
+                              accept=".pdf,.doc,.docx"
                               onChange={(e) => {
                                 if (e.target.files[0]) {
                                   setCvFile(e.target.files[0].name);
+                                  setCvFileObj(e.target.files[0]); // Store actual file
+                                  setCvUrl(""); // Reset URL for new file
                                   setCvAnalysis("");
                                 }
                               }}
@@ -734,14 +769,18 @@ const GlobalAccess = () => {
                     <div className="pt-6 stagger-enter delay-500">
                       <button
                         type="submit"
-                        disabled={isSubmitting}
+                        disabled={isSubmitting || isUploadingCv}
                         className="w-full h-16 bg-slate-900 rounded-2xl flex items-center justify-between px-8 text-white group hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 shadow-xl hover:shadow-2xl disabled:opacity-70 overflow-hidden relative"
                       >
                         <div className="absolute inset-0 bg-linear-to-r from-blue-600 via-purple-600 to-blue-600 animate-gradient-xy opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
                         <span className="font-bold tracking-wide relative z-10">
-                          {isSubmitting ? "PROCESSING..." : "SUBMIT REQUEST"}
+                          {isUploadingCv
+                            ? "UPLOADING CV..."
+                            : isSubmitting
+                            ? "SENDING..."
+                            : "SUBMIT REQUEST"}
                         </span>
-                        {isSubmitting ? (
+                        {isSubmitting || isUploadingCv ? (
                           <Loader2 className="animate-spin relative z-10" />
                         ) : (
                           <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center group-hover:translate-x-2 transition-transform relative z-10">
