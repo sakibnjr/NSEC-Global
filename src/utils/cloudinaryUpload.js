@@ -36,9 +36,6 @@ export const uploadToCloudinary = async (file) => {
 
     const data = await response.json();
 
-    // Debug: Log the full Cloudinary response
-    console.log("Cloudinary upload response:", data);
-
     // For raw files, secure_url is directly downloadable
     // The URL will automatically download when clicked
     return {
